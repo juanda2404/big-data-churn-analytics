@@ -1,0 +1,88 @@
+================================================================
+ PROYECTO FINAL BIG DATA - TOKIO TELECOM
+ Comandos ejecutados en Apache Cassandra (Tarea 2)
+ Autor: Juan David Collazos Gonzalez
+================================================================
+
+----------------------------------------------------------------
+ 0. ENTORNO: CASSANDRA SOBRE DOCKER (ejecucion local)
+----------------------------------------------------------------
+# Cassandra se ejecuto en un contenedor Docker local, de modo que
+# el entorno es 100% reproducible sin instalar Cassandra en el sistema.
+
+# 0.1 Descargar la imagen oficial y levantar el contenedor
+#     (-p 9042:9042 publica el puerto CQL; -d lo deja en segundo plano)
+docker run --name cassandra-tokio -p 9042:9042 -d cassandra:5.0
+
+# 0.2 Comprobar que el nodo esta operativo (estado UN = Up/Normal)
+docker exec -it cassandra-tokio nodetool status
+
+# 0.3 Copiar el CSV al interior del contenedor para poder importarlo
+docker cp customer_churn_10k.csv cassandra-tokio:/customer_churn_10k.csv
+
+# 0.4 Abrir la shell CQL (cqlsh) dentro del contenedor
+docker exec -it cassandra-tokio cqlsh
+
+----------------------------------------------------------------
+ 1. CREACION DEL KEYSPACE Y LA TABLA
+----------------------------------------------------------------
+CREATE KEYSPACE telecom_analytics
+  WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+  AND durable_writes = true;
+
+CREATE TABLE telecom_analytics.customer_churn (
+    "CustomerID" double PRIMARY KEY,
+    "Age" double,
+    "Churn_YesNo" text,
+    "Contract Length" text,
+    "Gender" text,
+    "Last Interaction" double,
+    "Payment Delay" double,
+    "Subscription Type" text,
+    "Support Calls" double,
+    "Tenure" double,
+    "Total Spend" double,
+    "Usage Frequency" double
+);
+
+-- Indices secundarios para poder filtrar por estas columnas
+CREATE INDEX idx_contract_length   ON telecom_analytics.customer_churn ("Contract Length");
+CREATE INDEX idx_subscription_type ON telecom_analytics.customer_churn ("Subscription Type");
+
+----------------------------------------------------------------
+ 2. IMPORTACION DE LOS 10.000 REGISTROS DESDE EL CSV
+----------------------------------------------------------------
+COPY telecom_analytics.customer_churn
+     ("CustomerID","Age","Gender","Tenure","Usage Frequency","Support Calls",
+      "Payment Delay","Subscription Type","Contract Length","Total Spend",
+      "Last Interaction","Churn_YesNo")
+FROM '/customer_churn_10k.csv'
+WITH HEADER = TRUE;
+
+----------------------------------------------------------------
+ 3. CONSULTAS SOLICITADAS (TAREA 2)
+----------------------------------------------------------------
+
+-- 3.a) Recuperar TODOS los registros de la tarifa Basic
+SELECT * FROM telecom_analytics.customer_churn
+WHERE "Subscription Type" = 'Basic' ALLOW FILTERING;
+
+--     Numero de clientes de la tarifa Basic:
+SELECT COUNT(*) FROM telecom_analytics.customer_churn
+WHERE "Subscription Type" = 'Basic' ALLOW FILTERING;
+--     Resultado: 3233
+
+-- 3.b) Recuperar TODOS los registros de la tarifa Basic con contrato anual
+SELECT * FROM telecom_analytics.customer_churn
+WHERE "Subscription Type" = 'Basic'
+  AND "Contract Length" = 'Annual' ALLOW FILTERING;
+
+--     Numero de clientes Basic + Annual:
+SELECT COUNT(*) FROM telecom_analytics.customer_churn
+WHERE "Subscription Type" = 'Basic'
+  AND "Contract Length" = 'Annual' ALLOW FILTERING;
+--     Resultado: 1250
+
+================================================================
+ FIN DEL FICHERO
+================================================================
