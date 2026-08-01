@@ -1,7 +1,1 @@
-__pycache__/
-*.pyc
-.env
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+.DS_Store
